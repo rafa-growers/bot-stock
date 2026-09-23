@@ -8,6 +8,7 @@ import os
 
 import requests
 from bs4 import BeautifulSoup
+from curl_cffi import requests as navegador
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
@@ -15,14 +16,7 @@ ARCHIVO_TIENDAS = "tiendas.json"
 ARCHIVO_ESTADO = "estado.json"
 FALLOS_ANTES_DE_AVISAR = 3  # 3 fallos seguidos = unos 30 minutos sin poder revisar
 
-CABECERAS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "es-ES,es;q=0.9",
-}
+CABECERAS = {"Accept-Language": "es-ES,es;q=0.9"}
 
 
 def enviar_telegram(mensaje):
@@ -45,7 +39,9 @@ def cargar_json(ruta, por_defecto):
 
 
 def leer_texto_pagina(url):
-    respuesta = requests.get(url, headers=CABECERAS, timeout=30)
+    # Visitamos la página haciéndonos pasar por Google Chrome
+    # para que las tiendas no bloqueen al bot
+    respuesta = navegador.get(url, headers=CABECERAS, impersonate="chrome", timeout=30)
     respuesta.raise_for_status()
     sopa = BeautifulSoup(respuesta.text, "html.parser")
     for etiqueta in sopa(["script", "style", "noscript"]):
