@@ -21,13 +21,20 @@ CABECERAS = {"Accept-Language": "es-ES,es;q=0.9"}
 
 def enviar_telegram(mensaje):
     if not TOKEN or not CHAT_ID:
-        print("Faltan TELEGRAM_TOKEN o TELEGRAM_CHAT_ID en los secretos de GitHub")
+        print("ERROR TELEGRAM: faltan TELEGRAM_TOKEN o TELEGRAM_CHAT_ID en los secretos de GitHub")
         return
-    requests.post(
-        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-        data={"chat_id": CHAT_ID, "text": mensaje, "disable_web_page_preview": True},
-        timeout=20,
-    )
+    try:
+        r = requests.post(
+            f"https://api.telegram.org/bot{TOKEN.strip()}/sendMessage",
+            data={"chat_id": CHAT_ID.strip(), "text": mensaje, "disable_web_page_preview": True},
+            timeout=20,
+        )
+        if r.ok:
+            print("Telegram: mensaje enviado")
+        else:
+            print(f"ERROR TELEGRAM ({r.status_code}): {r.text}")
+    except Exception as error:
+        print(f"ERROR TELEGRAM: {error}")
 
 
 def cargar_json(ruta, por_defecto):
@@ -101,6 +108,20 @@ def main():
             enviar_telegram(f"❌ {nombre} se ha vuelto a agotar.\n{url}")
 
         stock_guardado[url] = stock
+
+    # Si lo lanzas a mano desde GitHub, te manda un resumen para comprobar que funciona
+    if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+        lineas = []
+        for tienda in tiendas:
+            valor = stock_guardado.get(tienda["url"])
+            if fallos.get(tienda["url"], 0) > 0:
+                situacion = "⚠️ no se pudo revisar"
+            elif valor:
+                situacion = "HAY STOCK ✅"
+            else:
+                situacion = "agotado ❌"
+            lineas.append(f"• {tienda['nombre']}: {situacion}")
+        enviar_telegram("🧪 Revisión manual\n" + "\n".join(lineas))
 
     with open(ARCHIVO_ESTADO, "w", encoding="utf-8") as f:
         json.dump(estado, f, ensure_ascii=False, indent=2)
